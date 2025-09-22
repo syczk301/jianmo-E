@@ -122,6 +122,37 @@ def tf_features(x, fs, fr):
     return feats
 
 
+def extract_features_from_long(long_table, signal_col="DE_time", fs=32000):
+    """
+    输入: long_table (含 file/status/.../signal_col/RPM)
+    输出: X (特征矩阵), y (标签)
+    """
+    feature_rows = []
+    labels = []
+
+    for fid, group in long_table.groupby("file"):
+        x = group[signal_col].dropna().values
+        if len(x) == 0:
+            continue
+
+        # 获取转速 fr (Hz)
+        rpm = group["RPM"].iloc[0]
+        fr = (rpm/60.0) if rpm and rpm>0 else 1.0
+
+        feats = {}
+        feats.update(time_features(x))
+        feats.update(freq_features(x, fs, fr))
+        feats.update(tf_features(x, fs, fr))
+
+        feats["文件名"] = fid
+        feature_rows.append(feats)
+        labels.append(group["status"].iloc[0])
+
+    X = pd.DataFrame(feature_rows).set_index("文件名")
+    y = pd.Series(labels, index=X.index, name="状态")
+    return X, y
+
+
 def extract_features_balanced_from_long(
     long_table: pd.DataFrame,
     signal_col: str = "DE_time",
@@ -207,6 +238,10 @@ def extract_features_balanced_from_long(
             mask = rng.random(L) < mix_ratio
             # 逐点拼接（掩码为 True 取 xa，否则取 xb）
             x_new = np.where(mask, xa_, xb_)
+
+            # 也可加一点极小高斯噪声，打破完全重复（可选）
+            # noise = rng.normal(0, 1e-6*np.std(x_new) if np.std(x_new)>0 else 1e-6, size=L)
+            # x_new = x_new + noise
 
             # 用 A 的 RPM 作为该新样本的转速
             rpm_new = rpm_a
@@ -330,14 +365,14 @@ def evaluate_model_performance(X_test, y_test, y_pred, y_pred_proba, classes, ti
 class PSO_RandomForest:
     """PSO优化随机森林超参数"""
     
-    def __init__(self, space, num_particles=20, num_iters=25, w=0.72, c1=1.49, c2=1.49, random_state=42):
+    def __init__(self, space, num_particles=20, num_iters=25, w=0.72, c1=1.49, c2=1.49):
         self.space = space
         self.num_particles = num_particles
         self.num_iters = num_iters
         self.w = w
         self.c1 = c1
         self.c2 = c2
-        self.rng = np.random.default_rng(random_state)
+        self.rng = np.random.default_rng(2025)
         
         # 初始化边界
         keys = list(space.keys())
@@ -536,13 +571,20 @@ def main():
         mix_ratio=0.5,
         random_state=42
     )
-    
+
+    # 验证特征矩阵
+    print(f"   均衡后特征矩阵形状：{X_bal.shape}")
+    print(f"   特征列：{list(X_bal.columns)}")
+
     # 绘制标签分布
     plot_label_distribution(y_bal, "均衡后标签分布")
     
     # 3. 特征选择
     print("3. 特征选择...")
     X_selected, selected_features = feature_selection_rfe(X_bal, y_bal, n_features=20)
+
+    # 验证选择的特征
+    print(f"   选择的特征：{list(selected_features)}")
     
     # 4. 随机森林基线模型
     print("4. 训练随机森林基线模型...")
