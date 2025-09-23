@@ -7,6 +7,8 @@ import importlib
 import numpy as np
 import pandas as pd
 import math
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -278,6 +280,39 @@ def train_transformer_model(
     return model, (X_test, y_test, y_pred, y_proba, classes), (scaler, le)
 
 
+def plot_confusion_matrix(y_true, y_pred, classes, model_name, figsize=(10, 8)):
+    """绘制混淆矩阵"""
+    # 计算混淆矩阵
+    cm = confusion_matrix(y_true, y_pred)
+    
+    # 创建图形
+    plt.figure(figsize=figsize)
+    
+    # 使用seaborn绘制热图
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=classes, yticklabels=classes,
+                cbar_kws={'label': '样本数量'})
+    
+    plt.title(f'{model_name} 混淆矩阵', fontsize=16, fontweight='bold')
+    plt.xlabel('预测标签', fontsize=12)
+    plt.ylabel('真实标签', fontsize=12)
+    plt.xticks(rotation=45, ha='right')
+    plt.yticks(rotation=0)
+    
+    # 调整布局
+    plt.tight_layout()
+    
+    # 保存图片
+    filename = f'{model_name}_confusion_matrix.png'
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    print(f"混淆矩阵已保存为: {filename}")
+    
+    # 显示图片
+    plt.show()
+    
+    return cm
+
+
 def evaluate_model_performance_simple(X_test, y_test, y_pred, y_proba, classes, model_name):
     """简单的模型性能评估"""
     accuracy = accuracy_score(y_test, y_pred)
@@ -286,7 +321,11 @@ def evaluate_model_performance_simple(X_test, y_test, y_pred, y_proba, classes, 
     print("\n分类报告:")
     print(classification_report(y_test, y_pred))
     print("\n混淆矩阵:")
-    print(confusion_matrix(y_test, y_pred))
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
+    
+    # 绘制混淆矩阵
+    plot_confusion_matrix(y_test, y_pred, classes, model_name)
 
 
 def main():
