@@ -344,11 +344,13 @@ def main():
         return None
 
     print("2. 数据平衡和特征提取...")
+    # 根据实际数据分布，OR类有77个样本，是最多的类别
+    # 将其他类别也平衡到77个样本，保持数据集平衡
     X_bal, y_bal = extract_features_balanced_from_long(
         long_table,
         signal_col="DE_time",
         fs=32000,
-        target_per_class=77,
+        target_per_class=77,  # 基于最大类别数量设置
         mix_ratio=0.5,
         random_state=42,
     )
